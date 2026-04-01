@@ -1,15 +1,15 @@
 // classDiagram
-//     class User {
+//     class Owner {
 //         +String name
 //         +int time_available
 //         +dict preferences
-//         +Pet pet
+//         +List~Pet~ pets
 //     }
 //
 //     class Pet {
 //         +String name
 //         +String species
-//         +User owner
+//         +Owner owner
 //         +List~Task~ tasks
 //         +add_task(task)
 //         +remove_task(task)
@@ -20,6 +20,7 @@
 //         +String category
 //         +int duration
 //         +String priority
+//         +String frequency
 //         +String notes
 //     }
 //
@@ -32,7 +33,7 @@
 //
 //     class DailyPlan {
 //         +String date
-//         +User user
+//         +Owner owner
 //         +Pet pet
 //         +int time_available
 //         +List~ScheduledTask~ scheduled_tasks
@@ -44,20 +45,20 @@
 //     }
 //
 //     class Scheduler {
-//         +User user
+//         +Owner owner
 //         +Pet pet
 //         +generate(date) DailyPlan
 //         -_sort_tasks(tasks) List~Task~
 //         -_build_reasoning(scheduled, skipped) String
 //     }
 //
-//     User "1" --> "1" Pet : owns
+//     Owner "1" --> "0..*" Pet : owns
 //     Pet "1" --> "0..*" Task : has
-//     DailyPlan "1" --> "1" User : belongs to
+//     DailyPlan "1" --> "1" Owner : belongs to
 //     DailyPlan "1" --> "1" Pet : for
 //     DailyPlan "1" --> "0..*" ScheduledTask : contains
 //     DailyPlan "1" --> "0..*" Task : skipped
 //     ScheduledTask "1" --> "1" Task : wraps
-//     Scheduler "1" --> "1" User : uses
+//     Scheduler "1" --> "1" Owner : uses
 //     Scheduler "1" --> "1" Pet : schedules
 //     Scheduler ..> DailyPlan : creates

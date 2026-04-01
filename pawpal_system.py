@@ -8,18 +8,18 @@ from typing import Literal
 # ---------------------------------------------------------------------------
 
 @dataclass
-class User:
+class Owner:
     name: str
     time_available: int                      # minutes per day available for pet care
     preferences: dict = field(default_factory=dict)  # e.g. {"preferred_time": "morning"}
-    pet: Pet | None = None                   # set after Pet is created to avoid circular init
+    pets: list[Pet] = field(default_factory=list)    # set after Pet is created to avoid circular init
 
 
 @dataclass
 class Pet:
     name: str
     species: Literal["dog", "cat", "other"]
-    owner: User
+    owner: Owner
     tasks: list[Task] = field(default_factory=list)
 
     def add_task(self, task: Task) -> None:
@@ -37,6 +37,7 @@ class Task:
     category: Literal["walk", "feeding", "meds", "enrichment", "grooming", "other"]
     duration: int                            # minutes
     priority: Literal["high", "medium", "low"]
+    frequency: Literal["daily", "twice_daily", "weekly", "as_needed"]
     notes: str = ""
 
 
@@ -54,9 +55,9 @@ class ScheduledTask:
 @dataclass
 class DailyPlan:
     date: str                                # e.g. "2026-04-01"
-    user: User
+    owner: Owner
     pet: Pet
-    time_available: int                      # required — copied from user.time_available at plan creation
+    time_available: int                      # required — copied from owner.time_available at plan creation
     scheduled_tasks: list[ScheduledTask] = field(default_factory=list)
     skipped_tasks: list[Task] = field(default_factory=list)
     time_used: int = 0                       # sum of scheduled task durations
@@ -76,12 +77,12 @@ class DailyPlan:
 # ---------------------------------------------------------------------------
 
 class Scheduler:
-    """Generates a DailyPlan for a pet given the owner's time constraints."""
+    """Generates a DailyPlan for a specific pet given the owner's time constraints."""
 
-    def __init__(self, user: User, pet: Pet):
-        if pet.owner is not user:
-            raise ValueError(f"Pet '{pet.name}' does not belong to user '{user.name}'")
-        self.user = user
+    def __init__(self, owner: Owner, pet: Pet):
+        if pet not in owner.pets:
+            raise ValueError(f"Pet '{pet.name}' does not belong to owner '{owner.name}'")
+        self.owner = owner
         self.pet = pet
 
     def _sort_tasks(self, tasks: list[Task]) -> list[Task]:
@@ -101,9 +102,10 @@ class Scheduler:
         Generate and return a DailyPlan for the given date.
 
         Algorithm:
-        1. Sort pet's tasks by priority then duration.
-        2. Greedily add tasks until time_available is exhausted.
-        3. Remaining tasks go into skipped_tasks.
-        4. Build reasoning string.
+        1. Filter pet's tasks by frequency (skip weekly tasks on non-designated days, etc.).
+        2. Sort remaining tasks by priority then duration.
+        3. Greedily add tasks until time_available is exhausted.
+        4. Remaining tasks go into skipped_tasks.
+        5. Build reasoning string.
         """
         ...
