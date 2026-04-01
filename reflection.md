@@ -1,33 +1,35 @@
 # PawPal+ Project Reflection
 
 ## 1. System Design
-Core Action
-- add user and pet
-- add tasks
-- create scedules
-- what info to save: User, Pet, Tasks (walks, feeding, meds, enrichment, grooming, etc.)
-user object:
-- name, pet, time available, priority, Preferences
-
-pet object:
-- name, owner, tasks[]
-
-task object:
-- name, duration
-
-scedule object:
-- user, pet, task, status
 
 **a. Initial design**
 
 - Briefly describe your initial UML design.
 - What classes did you include, and what responsibilities did you assign to each?
+Core Action
+- add user and pet
+- add tasks
+- create scedules
+1. User
+name, time_available (minutes/day), preferences
 
+2. Pet
+name, species, owner
+
+3. Task
+name, category, duration, priority, pet, notes
+
+4. ScheduledTask (new)
+task, order, status
+
+5. DailyPlan (replaces schedule)
+date, user, pet, scheduled_tasks[], skipped_tasks[], time_available, time_used, reasoning
 **b. Design changes**
 
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.
-
+-> removed priority from User
+-> added priority and category in task
 ---
 
 ## 2. Scheduling Logic and Tradeoffs

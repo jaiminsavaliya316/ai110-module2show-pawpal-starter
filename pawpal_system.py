@@ -10,8 +10,9 @@ from typing import Literal
 @dataclass
 class User:
     name: str
-    time_available: int                    # minutes per day available for pet care
+    time_available: int                      # minutes per day available for pet care
     preferences: dict = field(default_factory=dict)  # e.g. {"preferred_time": "morning"}
+    pet: Pet | None = None                   # set after Pet is created to avoid circular init
 
 
 @dataclass
@@ -25,8 +26,8 @@ class Pet:
         """Add a task to this pet's task list."""
         ...
 
-    def remove_task(self, task_name: str) -> None:
-        """Remove a task from this pet's task list by name."""
+    def remove_task(self, task: Task) -> None:
+        """Remove a task from this pet's task list by object identity."""
         ...
 
 
@@ -34,7 +35,7 @@ class Pet:
 class Task:
     name: str
     category: Literal["walk", "feeding", "meds", "enrichment", "grooming", "other"]
-    duration: int                          # minutes
+    duration: int                            # minutes
     priority: Literal["high", "medium", "low"]
     notes: str = ""
 
@@ -42,28 +43,24 @@ class Task:
 @dataclass
 class ScheduledTask:
     task: Task
-    order: int                             # position in the day (1-based)
+    order: int                               # position in the day (1-based)
     status: Literal["pending", "completed", "skipped"] = "pending"
 
     def mark_complete(self) -> None:
         """Mark this scheduled task as completed."""
         ...
 
-    def mark_skipped(self) -> None:
-        """Mark this scheduled task as skipped."""
-        ...
-
 
 @dataclass
 class DailyPlan:
-    date: str                              # e.g. "2026-04-01"
+    date: str                                # e.g. "2026-04-01"
     user: User
     pet: Pet
+    time_available: int                      # required — copied from user.time_available at plan creation
     scheduled_tasks: list[ScheduledTask] = field(default_factory=list)
     skipped_tasks: list[Task] = field(default_factory=list)
-    time_available: int = 0               # minutes; copied from user at plan creation
-    time_used: int = 0                    # sum of scheduled task durations
-    reasoning: str = ""                   # plain-text explanation of scheduling decisions
+    time_used: int = 0                       # sum of scheduled task durations
+    reasoning: str = ""                      # plain-text explanation of scheduling decisions
 
     def total_tasks(self) -> int:
         """Return the total number of tasks considered (scheduled + skipped)."""
@@ -82,6 +79,8 @@ class Scheduler:
     """Generates a DailyPlan for a pet given the owner's time constraints."""
 
     def __init__(self, user: User, pet: Pet):
+        if pet.owner is not user:
+            raise ValueError(f"Pet '{pet.name}' does not belong to user '{user.name}'")
         self.user = user
         self.pet = pet
 
