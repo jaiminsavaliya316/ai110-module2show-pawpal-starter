@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
+from datetime import date as Date
 from typing import Literal
 
 
@@ -24,11 +25,15 @@ class Pet:
 
     def add_task(self, task: Task) -> None:
         """Add a task to this pet's task list."""
-        ...
+        if task not in self.tasks:
+            self.tasks.append(task)
 
     def remove_task(self, task: Task) -> None:
         """Remove a task from this pet's task list by object identity."""
-        ...
+        try:
+            self.tasks.remove(task)
+        except ValueError as exc:
+            raise ValueError("Task not found on this pet") from exc
 
 
 @dataclass
@@ -49,7 +54,7 @@ class ScheduledTask:
 
     def mark_complete(self) -> None:
         """Mark this scheduled task as completed."""
-        ...
+        self.status = "completed"
 
 
 @dataclass
@@ -65,11 +70,16 @@ class DailyPlan:
 
     def total_tasks(self) -> int:
         """Return the total number of tasks considered (scheduled + skipped)."""
-        ...
+        return len(self.scheduled_tasks) + len(self.skipped_tasks)
 
     def summary(self) -> str:
         """Return a short human-readable summary of the plan."""
-        ...
+        scheduled = len(self.scheduled_tasks)
+        skipped = len(self.skipped_tasks)
+        return (
+            f"{self.date}: {scheduled} scheduled, {skipped} skipped, "
+            f"{self.time_used}/{self.time_available} minutes used."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -87,7 +97,15 @@ class Scheduler:
 
     def _sort_tasks(self, tasks: list[Task]) -> list[Task]:
         """Sort tasks by priority (high → low), then by duration (short first)."""
-        ...
+        priority_rank = {"high": 0, "medium": 1, "low": 2}
+        return sorted(
+            tasks,
+            key=lambda task: (
+                priority_rank.get(task.priority, 3),
+                task.duration,
+                task.name,
+            ),
+        )
 
     def _build_reasoning(
         self,
@@ -95,17 +113,60 @@ class Scheduler:
         skipped: list[Task],
     ) -> str:
         """Produce a plain-text explanation of why tasks were chosen and ordered."""
-        ...
+        lines: list[str] = []
+
+        if scheduled:
+            lines.append("Scheduled the following tasks in priority order:")
+            for index, task in enumerate(scheduled, start=1):
+                lines.append(
+                    f"{index}. {task.name} — priority {task.priority}, {task.duration} min"
+                )
+        else:
+            lines.append("No tasks could be scheduled within the available time.")
+
+        if skipped:
+            lines.append("")
+            lines.append("Skipped these tasks due to time or frequency constraints:")
+            for task in skipped:
+                lines.append(
+                    f"- {task.name} ({task.frequency}, priority {task.priority}, {task.duration} min)"
+                )
+
+        return "\n".join(lines)
 
     def generate(self, date: str) -> DailyPlan:
-        """
-        Generate and return a DailyPlan for the given date.
+        """Filter, sort, and greedily schedule the pet's tasks into a DailyPlan."""
+        plan_date = Date.fromisoformat(date)
+        available = self.owner.time_available
+        eligible: list[Task] = []
+        skipped: list[Task] = []
 
-        Algorithm:
-        1. Filter pet's tasks by frequency (skip weekly tasks on non-designated days, etc.).
-        2. Sort remaining tasks by priority then duration.
-        3. Greedily add tasks until time_available is exhausted.
-        4. Remaining tasks go into skipped_tasks.
-        5. Build reasoning string.
-        """
-        ...
+        for task in self.pet.tasks:
+            if task.frequency == "weekly" and plan_date.weekday() != 0:
+                skipped.append(task)
+            else:
+                eligible.append(task)
+
+        sorted_tasks = self._sort_tasks(eligible)
+        scheduled: list[ScheduledTask] = []
+        time_used = 0
+
+        for order, task in enumerate(sorted_tasks, start=1):
+            if time_used + task.duration <= available:
+                time_used += task.duration
+                scheduled.append(ScheduledTask(task=task, order=len(scheduled) + 1))
+            else:
+                skipped.append(task)
+
+        reasoning = self._build_reasoning([task.task for task in scheduled], skipped)
+
+        return DailyPlan(
+            date=date,
+            owner=self.owner,
+            pet=self.pet,
+            time_available=available,
+            scheduled_tasks=scheduled,
+            skipped_tasks=skipped,
+            time_used=time_used,
+            reasoning=reasoning,
+        )
