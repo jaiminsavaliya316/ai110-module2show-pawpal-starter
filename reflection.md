@@ -1,6 +1,22 @@
 # PawPal+ Project Reflection
 
 ## 1. System Design
+Core Action
+- add user and pet
+- add tasks
+- create scedules
+- what info to save: User, Pet, Tasks (walks, feeding, meds, enrichment, grooming, etc.)
+user object:
+- name, pet, time available, priority, Preferences
+
+pet object:
+- name, owner, tasks[]
+
+task object:
+- name, duration
+
+scedule object:
+- user, pet, task, status
 
 **a. Initial design**
 
