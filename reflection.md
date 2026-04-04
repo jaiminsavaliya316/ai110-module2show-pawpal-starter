@@ -44,6 +44,15 @@ date, user, pet, scheduled_tasks[], skipped_tasks[], time_available, time_used, 
 - Describe one tradeoff your scheduler makes.
 - Why is that tradeoff reasonable for this scenario?
 
+The scheduler uses a **greedy, priority-first packing algorithm** rather than checking for exact time-slot conflicts before scheduling. It fills the day by fitting the highest-priority tasks first until the time budget runs out — it does not try to rearrange lower-priority tasks around a conflict to find a valid combination.
+
+This means conflict detection runs *after* the schedule is built, as a separate warning pass. Two tasks that overlap in time (e.g., "Morning walk" at 08:00 for 30 min and "Training session" at 08:15 for 20 min) will both be scheduled if there is enough total budget, and only then flagged with a warning. The scheduler does not automatically move one task to a different time to resolve the conflict.
+
+This tradeoff is reasonable for a personal pet-care app because:
+1. **Simplicity over perfection** — a greedy approach is easy to reason about and debug. Solving the full constraint-satisfaction problem (find a non-overlapping assignment that maximises priority) is NP-hard and unnecessary for a handful of daily tasks.
+2. **Owner stays in control** — surfacing a warning and letting the owner decide whether to reschedule is more appropriate than silently reordering their tasks without explanation.
+3. **Most tasks lack an exact time** — `scheduled_time` is optional. When tasks have no fixed time, overlap is undefined and the greedy order is the best available heuristic anyway.
+
 ---
 
 ## 3. AI Collaboration
