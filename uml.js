@@ -22,13 +22,16 @@
 //         +String priority
 //         +String frequency
 //         +String notes
+//         +String scheduled_time
+//         +String due_date
 //     }
 //
 //     class ScheduledTask {
 //         +Task task
 //         +int order
 //         +String status
-//         +mark_complete()
+//         +String scheduled_time
+//         +mark_complete(completed_on) Task
 //     }
 //
 //     class DailyPlan {
@@ -40,6 +43,7 @@
 //         +List~Task~ skipped_tasks
 //         +int time_used
 //         +String reasoning
+//         +List~String~ warnings
 //         +total_tasks() int
 //         +summary() String
 //     }
@@ -48,8 +52,17 @@
 //         +Owner owner
 //         +Pet pet
 //         +generate(date) DailyPlan
+//         +sort_by_time(tasks) List~Task~
+//         +check_conflicts(scheduled_tasks) List~String~
 //         -_sort_tasks(tasks) List~Task~
 //         -_build_reasoning(scheduled, skipped) String
+//     }
+//
+//     class FilterPlans {
+//         <<utility>>
+//         +filter_plans(plans, pet_name, status) List~ScheduledTask~
+//         +detect_conflicts(scheduled_tasks) List~Tuple~
+//         -_parse_time(t) int
 //     }
 //
 //     Owner "1" --> "0..*" Pet : owns
@@ -62,3 +75,6 @@
 //     Scheduler "1" --> "1" Owner : uses
 //     Scheduler "1" --> "1" Pet : schedules
 //     Scheduler ..> DailyPlan : creates
+//     Scheduler ..> FilterPlans : delegates conflict detection
+//     FilterPlans ..> DailyPlan : reads
+//     FilterPlans ..> ScheduledTask : filters

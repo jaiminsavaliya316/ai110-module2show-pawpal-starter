@@ -96,12 +96,26 @@ with col5:
         "Frequency", ["daily", "twice_daily", "weekly", "as_needed"]
     )
 with col6:
-    notes = st.text_input("Notes (optional)", value="")
+    scheduled_time = st.text_input(
+        "Scheduled time (HH:MM, optional)", value="", placeholder="e.g. 08:30"
+    )
+
+notes = st.text_input("Notes (optional)", value="")
 
 if st.button("Add Task"):
     if not task_name.strip():
         st.error("Task name cannot be blank.")
     else:
+        # Basic HH:MM validation
+        parsed_time = None
+        if scheduled_time.strip():
+            import re
+            if re.match(r"^\d{2}:\d{2}$", scheduled_time.strip()):
+                parsed_time = scheduled_time.strip()
+            else:
+                st.error("Scheduled time must be in HH:MM format (e.g. 08:30).")
+                st.stop()
+
         task = Task(
             name=task_name.strip(),
             category=category,
@@ -109,6 +123,7 @@ if st.button("Add Task"):
             priority=priority,
             frequency=frequency,
             notes=notes,
+            scheduled_time=parsed_time,
         )
         st.session_state.pet.add_task(task)
         st.session_state.tasks.append(task)
@@ -116,18 +131,28 @@ if st.button("Add Task"):
         st.success(f"Task '{task_name.strip()}' added.")
 
 if st.session_state.tasks:
-    st.markdown("**Current tasks:**")
+    st.markdown("**Current tasks** (sorted by scheduled time):")
+
+    # Use Scheduler.sort_by_time to display tasks in time order
+    scheduler_preview = Scheduler(
+        owner=st.session_state.owner, pet=st.session_state.pet
+    )
+    sorted_preview = scheduler_preview.sort_by_time(st.session_state.tasks)
+
+    PRIORITY_ICON = {"high": "🔴 high", "medium": "🟡 medium", "low": "🟢 low"}
+
     st.dataframe(
         [
             {
+                "Time": t.scheduled_time or "—",
                 "Name": t.name,
                 "Category": t.category,
                 "Duration (min)": t.duration,
-                "Priority": t.priority,
+                "Priority": PRIORITY_ICON.get(t.priority, t.priority),
                 "Frequency": t.frequency,
-                "Notes": t.notes,
+                "Notes": t.notes or "—",
             }
-            for t in st.session_state.tasks
+            for t in sorted_preview
         ],
         use_container_width=True,
     )
@@ -161,33 +186,76 @@ if st.session_state.plan is not None:
     plan = st.session_state.plan
     st.divider()
     st.subheader("Today's Plan")
+
+    # ---- Conflict warnings — shown prominently at the top ----
+    if plan.warnings:
+        st.error(
+            f"⚠️ **{len(plan.warnings)} scheduling conflict(s) detected for "
+            f"{plan.pet.name}** — review the warnings below before your day starts."
+        )
+        for warning in plan.warnings:
+            # Parse out the two task names for a friendlier message
+            st.warning(
+                f"**Schedule conflict:** {warning}\n\n"
+                "_Tip: Edit the scheduled times of one of these tasks so they "
+                "don't overlap, or reschedule the lower-priority task to another slot._"
+            )
+
+    # ---- Summary caption ----
     st.caption(plan.summary())
 
+    # ---- Metrics ----
     col_a, col_b, col_c = st.columns(3)
     col_a.metric("Time Used", f"{plan.time_used} min")
     col_b.metric("Time Available", f"{plan.time_available} min")
     col_c.metric("Tasks Scheduled", len(plan.scheduled_tasks))
 
+    time_remaining = plan.time_available - plan.time_used
+    if time_remaining == 0:
+        st.warning("Your available time is fully used — no room for extra tasks today.")
+    elif time_remaining <= 15:
+        st.warning(f"Only {time_remaining} minutes remain after scheduling.")
+    else:
+        st.success(f"{time_remaining} minutes of free time remaining today.")
+
+    # ---- Scheduled tasks table ----
     if plan.scheduled_tasks:
         st.markdown("#### Scheduled Tasks")
+
+        PRIORITY_ICON = {"high": "🔴 high", "medium": "🟡 medium", "low": "🟢 low"}
+        STATUS_ICON = {
+            "pending": "🕐 pending",
+            "completed": "✅ completed",
+            "skipped": "⏭ skipped",
+        }
+
         st.dataframe(
             [
                 {
                     "Order": sched_task.order,
+                    "Time": sched_task.scheduled_time or "—",
                     "Task": sched_task.task.name,
                     "Category": sched_task.task.category,
-                    "Priority": sched_task.task.priority,
+                    "Priority": PRIORITY_ICON.get(
+                        sched_task.task.priority, sched_task.task.priority
+                    ),
                     "Duration (min)": sched_task.task.duration,
                     "Frequency": sched_task.task.frequency,
-                    "Status": sched_task.status,
+                    "Status": STATUS_ICON.get(sched_task.status, sched_task.status),
                 }
                 for sched_task in plan.scheduled_tasks
             ],
             use_container_width=True,
         )
 
+    # ---- Skipped tasks table ----
     if plan.skipped_tasks:
         st.markdown("#### Skipped Tasks")
+        st.info(
+            f"{len(plan.skipped_tasks)} task(s) could not be scheduled today — "
+            "either due to time limits or frequency constraints (e.g. weekly tasks "
+            "only run on Mondays)."
+        )
         st.dataframe(
             [
                 {
@@ -197,7 +265,7 @@ if st.session_state.plan is not None:
                     "Duration (min)": t.duration,
                     "Frequency": t.frequency,
                     "Reason": (
-                        "weekly task (not Monday)"
+                        "weekly task — not scheduled today"
                         if t.frequency == "weekly"
                         else "insufficient time remaining"
                     ),
@@ -207,5 +275,6 @@ if st.session_state.plan is not None:
             use_container_width=True,
         )
 
+    # ---- Scheduling reasoning ----
     with st.expander("Scheduling Reasoning", expanded=True):
         st.text(plan.reasoning)
